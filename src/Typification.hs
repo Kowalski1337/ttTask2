@@ -6,6 +6,14 @@ import Type
 import qualified Data.Map as M
 import qualified Data.List as L
 
+-- \f.(\x. f (x x)) (\x. f (x x))
+
+
+sample :: Expression
+sample = Ab (Var "f") (Ap (Ab (Var "x")(Ap (Var "f") (Ap (Var "x")(Var "x"))))  (Ab (Var "x")(Ap (Var "f") (Ap (Var "x")(Var "x")))) )
+
+simple :: Expression
+simple = Ap (Ab (Var "x")(Ap (Var "x")(Var "x"))) (Ab (Var "x")(Ap (Var "x")(Var "x")))
 
 generateSystem :: M.Map String CarryType -> Expression -> Int -> (M.Map String CarryType, CarryType, [(CarryType, CarryType)], Int, TypeTree)
 generateSystem mp (Var s) num =
@@ -70,22 +78,22 @@ solveSystem syst@((_, (f, s)) : other) =
       where
         solve :: [(Bool, (CarryType, CarryType))] -> Maybe [(Bool, (CarryType, CarryType))]
         solve ((_, ((Impl l1 l2), (Impl r1 r2))) : other) =
-            solveSystem ((False, (l1, r1)) : (False, (l2, r2)) : other)
-        solve ((_, eq@(expr, w@(VarType x))) : other)     = solveSystem ((False, (w,expr)) : other)
+             solveSystem ((False, (l1, r1)) : (False, (l2, r2)) : other)
         solve ((_, eq@(w@(VarType x), expr)) : other)     =
             if contains w expr
             then Nothing
-            else solveSystem (map (substitute w expr) other ++ [(True, eq)])
+            else solveSystem ((map (substitute w expr) other) ++ [(True, eq)])
               where
                 contains :: CarryType -> CarryType -> Bool
                 contains x (Impl f s) = (contains x f) || (contains x s)
                 contains x y = x == y
+        solve ((_, (expr, w@(VarType x))) : other)        = solveSystem ((False, (w,expr)) : other)
         solve _                                           = Just []
 solveSystem _                          = Just []
 
 
 generateProof :: M.Map String CarryType -> TypeTree -> Expression -> ProofType
-generateProof mp (Zero t) expr                            = Leaf (L (M.toList mp) expr t 1)
+generateProof mp (Zero t) expr                             = Leaf (L (M.toList mp) expr t 1)
 generateProof mp (Two t f s) expr@(Ap l r)                 = App (L (M.toList mp) expr t 2) (generateProof mp f l) (generateProof mp s r)
 generateProof mp (One t@(Impl tt _) e) expr@(Ab (Var s) r) = Abs (L (M.toList mp) expr t 3) (generateProof (M.insert s tt mp) e r)
 
